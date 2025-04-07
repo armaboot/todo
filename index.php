@@ -21,7 +21,7 @@
         }
         echo '</ul>';
     } else {
-        echo 'File not found';
+        echo 'Файл не найден';
     }
 ?>
 
