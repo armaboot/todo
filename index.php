@@ -93,9 +93,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <?php endif; ?>
         </div>
         <div>
-            <!--            <button class="outline">Search</button>-->
+
         </div>
-        <!--        <div></div>-->
+
 
     </div>
 </main>
@@ -104,21 +104,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     document.addEventListener("DOMContentLoaded", function () {
         document.querySelectorAll('.delete-task').forEach(function(button) {
             button.addEventListener('click', function(event) {
-                event.preventDefault(); // Предотвращение стандартной отправки формы
+                event.preventDefault();
 
-                var taskId = this.value; // Получаем ID задачи
-                var taskDiv = this.closest('.task-item'); // Находим div с задачей
+                var taskId = this.value;
+                var taskDiv = this.closest('.task-item');
 
-                // Отправляем AJAX-запрос на сервер для удаления задачи
+
                 var xhr = new XMLHttpRequest();
                 xhr.open('POST', window.location.href, true);
                 xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
                 xhr.onreadystatechange = function() {
                     if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-                        taskDiv.style.display = 'none'; // Скрываем div с задачей
+                        taskDiv.style.display = 'none';
                     }
                 };
-                xhr.send('delete=' + encodeURIComponent(taskId) + '&ajax=true'); // Отправляем ID задачи на сервер
+                xhr.send('delete=' + encodeURIComponent(taskId) + '&ajax=true');
             });
         });
     });
