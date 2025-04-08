@@ -14,9 +14,14 @@ if ($_SERVER['REQUEST_METHOD'] != 'POST') {
 
 // Обработка POST-запросов
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Добавление задачи, если она не пустая
+    // Читаем текущие задачи из файла
+    $currentTasks = file_exists('data.txt') ? array_map('trim', file('data.txt')) : [];
+
+    // Добавление новой задачи, если она не пустая
     if (isset($_POST['task']) && !empty(trim($_POST['task']))) {
-        $tasks[] = trim($_POST['task']);
+        $newTask = trim($_POST['task']);
+        // Объединяем старые задачи с новой задачей
+        $tasks = array_merge($currentTasks, [$newTask]);
     }
 
     // Удаление задачи по индексу
@@ -24,13 +29,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         array_splice($tasks, $_POST['delete'], 1);
     }
 
-    // Сохраняем новые данные в файл
+    // Сохраняем обновленные данные в файл
     file_put_contents('data.txt', implode("\n", array_values($tasks)));
+
+    // Ответ для AJAX-запроса
+    if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
+        echo json_encode(['status' => 'ok']); // Отправляем ответ для AJAX
+        exit; // Завершаем выполнение скрипта
+    }
 }
 ?>
 
 <!doctype html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport"
@@ -43,7 +54,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <title>TODOArma</title>
 </head>
 <body>
-
 
 <main class="container-fluid">
     <div class="grid">
@@ -69,26 +79,50 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 />
             </form>
             <?php if ($tasks): ?>
-            <?php foreach ($tasks as $key => $task): ?>
-                <div style="margin: 10px">
-                    <?= htmlspecialchars($task) ?>
-                    <form method="post" style="display: inline-block; margin-left: 10px;">
-                        <button name="delete" value="<?=$key?>">x</button>
-                    </form>
-                </div>
-            <?php endforeach; ?>
+                <?php foreach ($tasks as $key => $task): ?>
+                    <div style="margin: 10px" class="task-item">
+                        <span><?= htmlspecialchars($task) ?></span>
+                        <small>(ID: <?= $key + 1 ?>)</small>
+                        <form method="post" style="display: inline-block; margin-left: 10px;" class="delete-task-form">
+                            <button name="delete" value="<?=$key?>" class="delete-task">x</button>
+                        </form>
+                    </div>
+                <?php endforeach; ?>
             <?php else: ?>
                 <p>Нет задач.</p>
             <?php endif; ?>
         </div>
         <div>
-<!--            <button class="outline">Search</button>-->
+            <!--            <button class="outline">Search</button>-->
         </div>
-<!--        <div></div>-->
+        <!--        <div></div>-->
 
     </div>
 </main>
 
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        document.querySelectorAll('.delete-task').forEach(function(button) {
+            button.addEventListener('click', function(event) {
+                event.preventDefault(); // Предотвращение стандартной отправки формы
+
+                var taskId = this.value; // Получаем ID задачи
+                var taskDiv = this.closest('.task-item'); // Находим div с задачей
+
+                // Отправляем AJAX-запрос на сервер для удаления задачи
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', window.location.href, true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                        taskDiv.style.display = 'none'; // Скрываем div с задачей
+                    }
+                };
+                xhr.send('delete=' + encodeURIComponent(taskId) + '&ajax=true'); // Отправляем ID задачи на сервер
+            });
+        });
+    });
+</script>
 
 </body>
 </html>
