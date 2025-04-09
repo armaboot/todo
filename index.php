@@ -13,9 +13,6 @@ if (filter_has_var(INPUT_POST, 'tasks')) {
 // Чтение списка задач
 switch ($_SERVER['REQUEST_METHOD']) {
     case 'GET':
-        var_dump($_GET);
-        var_dump($http_response_header);
-
         if (file_exists('data.txt')) {
             $lines = file('data.txt');
             if ($lines !== false) {
@@ -50,8 +47,13 @@ switch ($_SERVER['REQUEST_METHOD']) {
             }
 
             // Удаление задачи по индексу
-            if (isset($_POST['delete']) && isset($tasks[$_POST['delete']])) {
-                array_splice($tasks, $_POST['delete'], 1);
+//            if (isset($_POST['delete']) && isset($tasks[$_POST['delete']])) {
+//                array_splice($tasks, $_POST['delete'], 1);
+//            }
+            if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+                $id = json_decode(file_get_contents('php://input'))->id;
+                if (isset($currentTasks[$id])) {
+                    unset($currentTasks[$id]);
             }
 
             // Сохраняем обновленные данные в файл
