@@ -1,14 +1,16 @@
 <?php
 
-var_dump($_POST);
-
-// Инициализация переменной $tasks
 $tasks = [];
-if (filter_has_var(INPUT_POST, 'tasks')) {
-    echo "Переменная tasks присутствует в POST-запросе";
-} else {
-    echo "Переменная tasks отсутствует в POST-запросе";
-}
+
+//решил переписать немного логику и поэкспериментировать
+//$taskInfo = 'Переменная tasks присутствует в POST-запросе';
+//var_dump(filter_var($taskInfo, INPUT_POST, 'tasks'));
+
+//if (filter_has_var(INPUT_POST, 'tasks')) {
+//    echo "Переменная tasks присутствует в POST-запросе";
+//} else {
+//    echo "Переменная tasks отсутствует в POST-запросе";
+//}
 
 // Чтение списка задач
 switch ($_SERVER['REQUEST_METHOD']) {
@@ -17,6 +19,9 @@ switch ($_SERVER['REQUEST_METHOD']) {
             $lines = file('data.txt');
             if ($lines !== false) {
                 $tasks = array_map('trim', $lines);
+                //решил переписать немного логику и поэкспериментировать
+                $taskInfo = 'Переменная tasks присутствует в POST-запросе';
+                var_dump(filter_var($taskInfo, INPUT_POST, 'tasks'));
             }
         }
         break;
@@ -29,36 +34,23 @@ switch ($_SERVER['REQUEST_METHOD']) {
             // Добавление новой задачи, если она не пустая
             if (isset($_POST['task']) && !empty(trim($_POST['task']))) {
                 $newTask = trim($_POST['task']);
-                // фильтруем новую задачу то есть проверяем на наличие спецсимполов html например
-                $sanitizedText = filter_var($newTask, FILTER_SANITIZE_STRING);
-
-                // проверка с помощью регулярок на содержание только текста без спецсимволов
-                if (!preg_match('/^[a-zA-Z\s]+$/', $sanitizedText)) {
-                    echo json_encode([
-                        'status' => 'error',
-                        'message' => 'Недопустимые символы введены'
-                    ]);
-                } else {
-                    echo "Текст прошёл валидацию: " . $sanitizedText;
-                }
+//                // фильтруем новую задачу то есть проверяем на наличие спецсимполов html например
+//                $sanitizedText = filter_var($newTask, FILTER_SANITIZE_STRING);
+//
+//                // проверка с помощью регулярок на содержание только текста без спецсимволов
+//                if (!preg_match('/^[a-zA-Z\s]+$/', $sanitizedText)) {
+//                    echo json_encode([
+//                        'status' => 'error',
+//                        'message' => 'Недопустимые символы введены'
+//                    ]);
+//                } else {
+//                    echo "Текст прошёл валидацию: " . $sanitizedText;
+//                }
 
                 // Объединяем старые задачи с новой задачей
                 $tasks = array_merge($currentTasks, [$newTask]);
             }
-
-            // Удаление задачи по индексу
-//            if (isset($_POST['delete']) && isset($tasks[$_POST['delete']])) {
-//                array_splice($tasks, $_POST['delete'], 1);
-//            }
-            if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
-                $id = json_decode(file_get_contents('php://input'))->id;
-                if (isset($currentTasks[$id])) {
-                    unset($currentTasks[$id]);
-            }
-
-            // Сохраняем обновленные данные в файл
             file_put_contents('data.txt', implode("\n", array_values($tasks)));
-
             // Ответ для AJAX-запроса
             if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
                 echo json_encode(['status' => 'ok']); // Отправляем ответ для AJAX
@@ -73,32 +65,15 @@ switch ($_SERVER['REQUEST_METHOD']) {
         if (isset($put_vars['update_task']) && isset($put_vars['index'])) {
             $updatedTask = trim($put_vars['update_task']);
             $index = intval($put_vars['index']);
+            $tasks[$index] = $updatedTask;
 
-            // Проверка индекса и задачи
-            if ($index >= 0 && isset($tasks[$index]) && !empty($updatedTask)) {
-                // фильтруем обновленную задачу
-                $sanitizedUpdatedTask = filter_var($updatedTask, FILTER_SANITIZE_STRING);
+            file_put_contents('data.txt', implode("\n", array_values($tasks)));
 
-                // проверка с помощью регулярок на содержание только текста без спецсимволов
-                if (!preg_match('/^[a-zA-Z\s]+$/', $sanitizedUpdatedTask)) {
-                    echo json_encode([
-                        'status' => 'error',
-                        'message' => 'Недопустимые символы введены'
-                    ]);
-                } else {
-                    // Обновляем задачу в массиве
-                    $tasks[$index] = $sanitizedUpdatedTask;
-
-                    // Сохраняем обновленный массив в файл
-                    file_put_contents('data.txt', implode("\n", array_values($tasks)));
-
-                    // Ответ для AJAX-запроса
-                    if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
-                        echo json_encode(['status' => 'ok']); // Отправляем ответ для AJAX
-                        exit; // Завершаем выполнение скрипта
-                    }
-                }
+            if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
+                echo json_encode(['status' => 'ok']);
+                exit;
             }
+
         }
         break;
     case 'DELETE':
@@ -133,24 +108,11 @@ switch ($_SERVER['REQUEST_METHOD']) {
         }
         break;
     default:
-        // Код для обработки неизвестных методов
-        http_response_code(405); // Метод не разрешен
+        // Код для обработки неизвестных методов - Методо не разрешен
+        http_response_code(405);
         echo "Метод запроса не поддерживается.";
         break;
 }
-
-
-//if ($_SERVER['REQUEST_METHOD'] != 'POST') {
-//    var_dump($_GET);
-//    var_dump($http_response_header);
-//    if (file_exists('data.txt')) {
-//        $lines = file('data.txt');
-//        if ($lines !== false) {
-//            $tasks = array_map('trim', $lines);
-//        }
-//    }
-//}
-
 
 ?>
 
@@ -158,13 +120,9 @@ switch ($_SERVER['REQUEST_METHOD']) {
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <link
-            rel="stylesheet"
-            href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
-    >
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <title>TODOArma</title>
 </head>
 <body>
@@ -258,3 +216,4 @@ switch ($_SERVER['REQUEST_METHOD']) {
 
 </body>
 </html>
+
