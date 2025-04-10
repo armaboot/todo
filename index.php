@@ -1,56 +1,51 @@
 <?php
 
+try {
+    $pdo = 'mysql:dbname=todo;host=127.0.0.1;port=3333';
+
+    $pdo = 'mysql:dbname=testdb;host=127.0.0.1';
+    $user = 'dbuser';
+    $password = 'dbpass';
+
+    $pdo = new PDO($pdo, $user, $password);
+
+    //$pdo = new PDO('sqlite:todo.db');
+   // $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+    // Создание таблицы, если она еще не существует
+    $createTableQuery = "
+        CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            text TEXT NOT NULL
+        )
+    ";
+
+    $pdo->exec($createTableQuery);
+} catch (PDOException $e) {
+    die("Ошибка подключения к базе данных: " . $e->getMessage());
+}
+
 $tasks = [];
 
-//решил переписать немного логику и поэкспериментировать
-//$taskInfo = 'Переменная tasks присутствует в POST-запросе';
-//var_dump(filter_var($taskInfo, INPUT_POST, 'tasks'));
-
-//if (filter_has_var(INPUT_POST, 'tasks')) {
-//    echo "Переменная tasks присутствует в POST-запросе";
-//} else {
-//    echo "Переменная tasks отсутствует в POST-запросе";
-//}
-
-// Чтение списка задач
 switch ($_SERVER['REQUEST_METHOD']) {
     case 'GET':
-        if (file_exists('data.txt')) {
-            $lines = file('data.txt');
-            if ($lines !== false) {
-                $tasks = array_map('trim', $lines);
-                //решил переписать немного логику и поэкспериментировать
-                $taskInfo = 'Переменная tasks присутствует в POST-запросе';
-                var_dump(filter_var($taskInfo, INPUT_POST, 'tasks'));
-            }
-        }
+        $selectQuery = "SELECT * FROM tasks ORDER BY id ASC"; // Запрашиваем все задачи, отсортированные по ID
+        $stmt = $pdo->prepare($selectQuery);
+        $stmt->execute();
+
+        $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC); // Получаем результат в виде ассоциативного массива
         break;
+
     case 'POST':
-        // Обработка POST-запросов
-        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-            // Читаем текущие задачи из файла
-            $currentTasks = file_exists('data.txt') ? array_map('trim', file('data.txt')) : [];
+        if (isset($_POST['task']) && !empty(trim($_POST['task']))) {
+            $newTask = trim($_POST['task']);
 
-            // Добавление новой задачи, если она не пустая
-            if (isset($_POST['task']) && !empty(trim($_POST['task']))) {
-                $newTask = trim($_POST['task']);
-//                // фильтруем новую задачу то есть проверяем на наличие спецсимполов html например
-//                $sanitizedText = filter_var($newTask, FILTER_SANITIZE_STRING);
-//
-//                // проверка с помощью регулярок на содержание только текста без спецсимволов
-//                if (!preg_match('/^[a-zA-Z\s]+$/', $sanitizedText)) {
-//                    echo json_encode([
-//                        'status' => 'error',
-//                        'message' => 'Недопустимые символы введены'
-//                    ]);
-//                } else {
-//                    echo "Текст прошёл валидацию: " . $sanitizedText;
-//                }
+            // Добавляем новую задачу в базу данных
+            $insertQuery = "INSERT INTO tasks (text) VALUES (:text)";
+            $stmt = $pdo->prepare($insertQuery);
+            $stmt->bindValue(':text', $newTask, PDO::PARAM_STR);
+            $stmt->execute();
 
-                // Объединяем старые задачи с новой задачей
-                $tasks = array_merge($currentTasks, [$newTask]);
-            }
-            file_put_contents('data.txt', implode("\n", array_values($tasks)));
             // Ответ для AJAX-запроса
             if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
                 echo json_encode(['status' => 'ok']); // Отправляем ответ для AJAX
@@ -58,6 +53,7 @@ switch ($_SERVER['REQUEST_METHOD']) {
             }
         }
         break;
+
     case 'PUT':
         parse_str(file_get_contents("php://input"), $put_vars);
 
@@ -65,17 +61,21 @@ switch ($_SERVER['REQUEST_METHOD']) {
         if (isset($put_vars['update_task']) && isset($put_vars['index'])) {
             $updatedTask = trim($put_vars['update_task']);
             $index = intval($put_vars['index']);
-            $tasks[$index] = $updatedTask;
 
-            file_put_contents('data.txt', implode("\n", array_values($tasks)));
+            // Обновляем задачу в базе данных
+            $updateQuery = "UPDATE tasks SET text = :text WHERE id = :id";
+            $stmt = $pdo->prepare($updateQuery);
+            $stmt->bindValue(':text', $updatedTask, PDO::PARAM_STR);
+            $stmt->bindValue(':id', $index, PDO::PARAM_INT);
+            $stmt->execute();
 
             if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
                 echo json_encode(['status' => 'ok']);
                 exit;
             }
-
         }
         break;
+
     case 'DELETE':
         parse_str(file_get_contents("php://input"), $delete_data);
 
@@ -83,37 +83,29 @@ switch ($_SERVER['REQUEST_METHOD']) {
         if (isset($delete_data['task_index']) && is_numeric($delete_data['task_index'])) {
             $taskIndex = intval($delete_data['task_index']);
 
-            // Читаем текущие задачи из файла
-            $currentTasks = file_exists('data.txt') ? array_map('trim', file('data.txt')) : [];
+            // Удаляем задачу из базы данных
+            $deleteQuery = "DELETE FROM tasks WHERE id = :id";
+            $stmt = $pdo->prepare($deleteQuery);
+            $stmt->bindValue(':id', $taskIndex, PDO::PARAM_INT);
+            $stmt->execute();
 
-            // Удаление задачи по индексу
-            if (isset($currentTasks[$taskIndex])) {
-                unset($currentTasks[$taskIndex]);
-
-                // Сохраняем оставшиеся задачи в файл
-                file_put_contents('data.txt', implode("\n", array_values($currentTasks)));
-
-                // Ответ для AJAX-запроса
-                if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
-                    echo json_encode(['status' => 'ok', 'message' => 'Задача удалена']); // Отправляем ответ для AJAX
-                    exit; // Завершаем выполнение скрипта
-                }
-            } else {
-                // Задача с таким индексом не найдена
-                echo json_encode(['status' => 'error', 'message' => 'Задача с данным индексом не найдена']);
+            // Ответ для AJAX-запроса
+            if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
+                echo json_encode(['status' => 'ok', 'message' => 'Задача удалена']); // Отправляем ответ для AJAX
+                exit; // Завершаем выполнение скрипта
             }
         } else {
             // Индекс задачи не передан или некорректен
             echo json_encode(['status' => 'error', 'message' => 'Необходимо указать корректный индекс задачи']);
         }
         break;
+
     default:
         // Код для обработки неизвестных методов - Методо не разрешен
         http_response_code(405);
         echo "Метод запроса не поддерживается.";
         break;
 }
-
 ?>
 
 <!doctype html>
@@ -154,10 +146,10 @@ switch ($_SERVER['REQUEST_METHOD']) {
             <?php if ($tasks): ?>
                 <?php foreach ($tasks as $key => $task): ?>
                     <div style="margin: 10px" class="task-item">
-                        <span><?= htmlspecialchars($task) ?></span>
-                        <small>(ID: <?= $key + 1 ?>)</small>
+                        <span><?= htmlspecialchars($task['text']) ?></span>
+                        <small>(ID: <?= $task['id'] ?>)</small>
                         <form method="post" style="display: inline-block; margin-left: 10px;" class="delete-task-form">
-                            <button name="delete" value="<?=$key?>" class="delete-task">x</button>
+                            <button name="delete" value="<?=$task['id']?>" class="delete-task">x</button>
                         </form>
                     </div>
                 <?php endforeach; ?>
@@ -216,4 +208,3 @@ switch ($_SERVER['REQUEST_METHOD']) {
 
 </body>
 </html>
-
