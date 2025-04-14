@@ -1,12 +1,12 @@
 <?php
 // проверка на пустую запись в форму
-require_once 'index.php';
+require_once 'version1.php';
 $name = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $name = test_input($_POST["name"]);
 }
-include 'index.php';
+include 'version1.php';
 function test_input($data) {
     return trim($data);
 
